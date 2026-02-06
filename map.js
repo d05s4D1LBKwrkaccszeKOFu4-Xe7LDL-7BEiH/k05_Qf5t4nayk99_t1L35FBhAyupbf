@@ -2,6 +2,7 @@
 const PMTILES_PATH = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '') + '/tiles/';
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol("pmtiles", protocol.tile);
+let blinkInterval = null;
 
 const fieldAliases = {
     'level': 'Этажность', 'address': 'Адрес', 'status': 'Тип', 
@@ -243,6 +244,32 @@ window.switchBasemap = function(type) {
     document.getElementById('btn-sat').classList.toggle('active', !isScheme);
 };
 
+function reorderLayers() {
+    if (!map.style || !map.isStyleLoaded()) return;
+    const topLayers = [
+        // 1. Сначала кладем слои Renovatio (они будут в самом низу, ПОД rm)
+        'layer-renovatio', 
+        'layer-renovatio-outline',
+
+        // 2. Затем слой RM (score_renov), чтобы он перекрывал renovatio (как вы просили)
+        'layer-score_renov', 
+        'layer-score_modern',
+
+        // 3. Остальные слои (будут поверх всего)
+        'layer-level', 'layer-year', 'layer-status', 
+        'highlight-builds', 'highlight-plots', 'highlight-districts', 'highlight-rm', 
+        'layer-transport', 'layer-transport-highlight', 
+        'layer-spsyntax', 
+        'layer-schools', 'layer-medical', 'layer-detsad', 'layer-college', 'layer-vuz', 
+        'layer-bus_stops',
+        'layer-renovatio-highlight'
+    ];
+    
+    topLayers.forEach(id => { 
+        if (map.getLayer(id)) map.moveLayer(id); 
+    });
+}
+
 map.on('load', async () => {
 
 function addSrc(name) {
@@ -309,7 +336,7 @@ for (const [metric, conf] of Object.entries(layersConfig)) {
     });
 });
 
-// 1. Основная заливка (почти прозрачная)
+// 1. Основная заливка (теперь полностью прозрачная, но нужна для кликабельности)
 map.addLayer({
     'id': 'layer-renovatio',
     'type': 'fill',
@@ -318,11 +345,11 @@ map.addLayer({
     'layout': { 'visibility': 'none' },
     'paint': { 
         'fill-color': '#e11d48', 
-        'fill-opacity': 0.05 // Почти прозрачный
+        'fill-opacity': 0 // <--- БЫЛО 0.05, СТАЛО 0 (прозрачная)
     }
 });
 
-// 2. Выделенная граница
+// 2. Выделенная граница (статичная красная рамка, если нужна)
 map.addLayer({
     'id': 'layer-renovatio-outline',
     'type': 'line',
@@ -331,26 +358,26 @@ map.addLayer({
     'layout': { 'visibility': 'none' },
     'paint': {
         'line-color': '#e11d48',
-        'line-width': 2, // Четкая граница
+        'line-width': 2,
         'line-opacity': 0.8
     }
 });
 
-// 3. Слой подсветки активного полигона
+// 3. Слой МОРГАНИЯ
 map.addLayer({
     'id': 'layer-renovatio-highlight',
-    'type': 'fill',
+    'type': 'line',
     'source': 'renovatio',
     'source-layer': 'renovatio',
     'layout': { 'visibility': 'none' },
     'paint': {
-        'fill-color': '#e11d48',
-        'fill-opacity': 0.4 // Яркая заливка для выделенного объекта
+        'line-color': '#007cff', // Ярко-синий
+        'line-width': 8,         // Максимальная толщина для акцента
+        'line-opacity': 1
     },
-    'filter': ['==', 'name', ''] // По умолчанию ничего не подсвечено
+    'filter': ['==', 'name', '']
 });
 
-    reorderLayers();
     map.on('error', (e) => console.error('Map error:', e));
 
     // Подсветка
@@ -450,6 +477,7 @@ document.querySelectorAll('.btn-toggle').forEach(btn => {
 });
 
 function toggleLayer(metric, show, type) {
+    if (!map.style || !map.isStyleLoaded()) return;
     if (layersConfig[metric]) {
         const layerId = `layer-${metric}`;
         if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', show ? 'visible' : 'none');
@@ -566,26 +594,46 @@ function renderHotspotsButtons(data) {
         btn.innerText = spot.name;
         
         btn.onclick = () => {
-            // 1. Перелет к координатам
-            map.flyTo({ center: spot.coords, zoom: 16, pitch: 45, essential: true });
+            // 1. Перелет к объекту (ЗУМ ИЗМЕНЕН НА 14.5)
+            // Было 16, стало 14.5, чтобы крупные объекты влезали целиком
+            map.flyTo({ center: spot.coords, zoom: 14.5, pitch: 45, essential: true });
             
-            // 2. Включаем подсветку конкретного полигона по имени
+            // 2. Логика МОРГАНИЯ (3 секунды)
+            
+// 2. Логика ПЛАВНОГО МОРГАНИЯ (3 секунды)
+            if (blinkInterval) clearInterval(blinkInterval);
+            
             map.setFilter('layer-renovatio-highlight', ['==', ['get', 'name'], spot.name]);
+            
+            // Устанавливаем длительность перехода (300мс), чтобы смена opacity была плавной
+            map.setPaintProperty('layer-renovatio-highlight', 'line-opacity-transition', { duration: 300 });
+            
+            let isVisible = true;
+            blinkInterval = setInterval(() => {
+                map.setPaintProperty('layer-renovatio-highlight', 'line-opacity', isVisible ? 0.1 : 1);
+                isVisible = !isVisible;
+            }, 400); // Интервал чуть больше длительности перехода для мягкости
+
+            setTimeout(() => {
+                clearInterval(blinkInterval);
+                blinkInterval = null;
+                map.setFilter('layer-renovatio-highlight', ['==', 'name', '']);
+            }, 3000);
             
             // 3. Вывод текста описания
             infoBox.innerText = spot.text;
             infoBox.style.display = 'block';
             
-            // 4. Визуальный стайл кнопки (активное состояние)
+            // 4. Визуальный стиль кнопок
             document.querySelectorAll('.hotspot-btn').forEach(b => { 
-                b.style.borderColor = '#e2e8f0'; 
-                b.style.background = '#f8fafc'; 
-                b.style.color = '#333';
+                b.classList.remove('active');
+                b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
             });
-            document.querySelectorAll('.hotspot-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            // Принудительные стили можно убрать, если есть класс .active в CSS, но оставим для надежности:
             btn.style.background = '#fff1f2'; 
             btn.style.color = '#be123c';
+            btn.style.borderColor = '#e11d48';
         };
         container.appendChild(btn);
     });
@@ -713,31 +761,6 @@ function loadBusRoutes() {
             setTimeout(() => map.setFilter('layer-transport-highlight', ['==', 'name', '']), 3000);
         };
         panel.appendChild(btn);
-    });
-}
-
-function reorderLayers() {
-    const topLayers = [
-        // 1. Сначала кладем слои Renovatio (они будут в самом низу, ПОД rm)
-        'layer-renovatio', 
-        'layer-renovatio-outline', 
-        'layer-renovatio-highlight',
-
-        // 2. Затем слой RM (score_renov), чтобы он перекрывал renovatio (как вы просили)
-        'layer-score_renov', 
-        'layer-score_modern',
-
-        // 3. Остальные слои (будут поверх всего)
-        'layer-level', 'layer-year', 'layer-status', 
-        'highlight-builds', 'highlight-plots', 'highlight-districts', 'highlight-rm', 
-        'layer-transport', 'layer-transport-highlight', 
-        'layer-spsyntax', 
-        'layer-schools', 'layer-medical', 'layer-detsad', 'layer-college', 'layer-vuz', 
-        'layer-bus_stops'
-    ];
-    
-    topLayers.forEach(id => { 
-        if (map.getLayer(id)) map.moveLayer(id); 
     });
 }
 
