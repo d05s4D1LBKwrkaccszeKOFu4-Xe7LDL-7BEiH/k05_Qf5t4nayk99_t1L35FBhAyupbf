@@ -244,15 +244,13 @@ window.switchBasemap = function(type) {
 };
 
 map.on('load', async () => {
-    const image = await map.loadImage('https://maplibre.org/maplibre-gl-js/docs/assets/custom_marker.png');
-    if (image) map.addImage('custom-marker', image.data);
 
 function addSrc(name) {
     map.addSource(name, {
         type: 'vector',
         url: `pmtiles://${PMTILES_PATH}${name}.pmtiles`,  // Пример: pmtiles://.../tiles/builds.pmtiles
         minzoom: 10,  // Твои зумы
-        maxzoom: 16
+        maxzoom: 14
     });
 }
             // function addSrc(name) {
