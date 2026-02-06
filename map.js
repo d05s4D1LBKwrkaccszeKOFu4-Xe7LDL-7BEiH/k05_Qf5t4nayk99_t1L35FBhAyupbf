@@ -1,7 +1,7 @@
 //const TILE_SERVER = 'http://localhost:7800';
 const TILE_SERVER = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '') + '/tiles';
-let protocol = new pmtiles.Protocol();
-maplibregl.addProtocol("pmtiles", protocol.add);
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles", protocol.tile);
 
 const fieldAliases = {
     'level': 'Этажность', 'address': 'Адрес', 'status': 'Тип', 
