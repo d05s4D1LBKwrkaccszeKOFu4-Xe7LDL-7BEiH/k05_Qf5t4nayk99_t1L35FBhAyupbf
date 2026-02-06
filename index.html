@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <title>Urban Catalogue – Kostanay</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+
+<div id="map"></div>
+
+<div style="position: absolute; top: 20px; right: 20px; z-index: 10; display: flex; align-items: center; gap: 10px;">
+    <button class="chart-toggle-btn" onclick="toggleChart()" style="margin-bottom: 0;">
+        <img src="stats.png" alt="Статистика" style="width: 18px; height: 18px; display: block;">
+    </button>
+
+    <a href="https://d05s4d1lbkwrkaccszekofu4-xe7ldl-7beih.github.io/KHC_MapLibre/" target="_blank" class="map-rk-link">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"></path></svg>
+        Карта РК
+    </a>
+
+    <div class="basemap-switcher" style="position: static; margin-left: 0;">
+        <button class="basemap-btn active" id="btn-scheme" onclick="switchBasemap('scheme')">Схема</button>
+        <button class="basemap-btn" id="btn-sat" onclick="switchBasemap('sat')">Спутник</button>
+    </div>
+</div>
+
+<div class="description-panel" id="descPanel">
+    <div class="desc-header">
+        <div style="display:flex; align-items:center; cursor:pointer; flex-grow:1;" onclick="toggleDescription()">
+            <span class="desc-title" id="descTitle">Инфо</span>
+            <span class="toggle-icon" id="descToggleBtn" style="margin-left:10px;">▼</span>
+        </div>
+        <div onclick="closeDescription()" style="cursor:pointer; padding:0 5px; color:#999; font-weight:bold;">✕</div>
+    </div>
+    <div id="descText">Выберите слои для отображения.</div>
+</div>
+
+<div class="chart-panel" id="chartPanel">
+    <div id="chartContent">
+         <h4 id="chartTitle">Статистика</h4>
+        <div class="chart-container">
+            <canvas id="infoChart"></canvas>
+            <div id="chartPlaceholder" style="display:none; width:100%; height:100%; background:#f8fafc; border-radius:8px; align-items:center; justify-content:center; color:#94a3b8; font-size:12px; font-weight:500;">
+                Нет данных для статистики
+            </div>
+        </div>
+         <div id="hotspotsContainer" style="display:none; margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
+             <div style="font-size:11px; font-weight:bold; margin-bottom:5px;">Горячие точки:</div>
+             <div id="hotspotsButtons"></div>
+             <div id="hotspotInfoText" class="hotspot-info-text"></div>
+         </div>
+    </div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="metrics-control-left" id="accordion">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; min-width: 150px;">
+        <button class="rubricator-btn" onclick="toggleMenu()" style="margin-bottom: 0; flex-shrink: 0;">
+            <img src="rubricator.png" alt="Меню">
+        </button>
+
+        <a href="https://homeportal.kz/" target="_blank" class="logo-circle" style="background: #003d1c; flex-shrink: 0;">
+            <img src="khc.png" alt="KHC" style="height: 15px; width: auto;">
+        </a>
+
+        <a href="https://q88.kz" target="_blank" class="logo-circle" style="background: #ffffff; flex-shrink: 0;">
+            <img src="q88.png" alt="Q88" style="height: 13px; width: auto;">
+        </a>
+    </div>
+
+    <div id="menuContent">
+        <div class="counter-header">
+            <div class="counter-badge">Включено: <span id="layerCount">0</span></div>
+            <button class="reset-btn" id="resetAllBtn" title="Сбросить все">✕ Очистить</button>
+        </div>
+
+        <details open>
+            <summary>1. Пространственный блок</summary>
+            <div class="metrics-group">
+                
+                <label class="layer-toggle">
+                    <input type="checkbox" data-metric="cadastre" data-type="cadastre"> 
+                    <span>Земельные участки</span>
+                </label>
+
+                <div class="divider"></div>
+
+                <div style="font-size:11px; color:#64748b; margin-bottom:4px; font-weight:600;">Здания и застройка</div>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn-toggle" data-group="builds" data-metric="level">Этажность</button>
+                    <button type="button" class="btn-toggle" data-group="builds" data-metric="year">Год</button>
+                    <button type="button" class="btn-toggle" data-group="builds" data-metric="status">Тип</button>
+                </div>
+
+                <div style="font-size:11px; color:#64748b; margin-bottom:4px; margin-top:8px; font-weight:600;">Плотность</div>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn-toggle" data-group="density" data-metric="density_gsi">Застройки</button>
+                    <button type="button" class="btn-toggle" data-group="density" data-metric="density_rds">Ул-дор. сети</button>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <div style="font-size:11px; color:#64748b; margin-bottom:4px; font-weight:600;">Развитие территорий</div>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn-toggle" data-group="rm" data-metric="score_renov">Реновация</button>
+                    <button type="button" class="btn-toggle" data-group="rm" data-metric="score_modern">Модернизация</button>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <div style="font-size:11px; color:#64748b; margin-bottom:4px; font-weight:600;">Space Syntax (Связность)</div>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn-toggle" data-group="spsyntax" data-metric="spsyntax_int">Интеграция</button>
+                    <button type="button" class="btn-toggle" data-group="spsyntax" data-metric="spsyntax_ch">Выбор</button>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <label class="layer-toggle">
+                    <input type="checkbox" data-metric="transport" data-type="transport"> 
+                    <span>Общественный транспорт</span>
+                </label>
+                <div id="routes-panel" style="display:none; flex-wrap:wrap; gap:5px; margin-top:5px;"></div>
+            </div>
+        </details>
+
+        <details>
+            <summary>2. Экономический блок</summary>
+            <div class="metrics-group">
+                <label class="layer-toggle">
+                    <input type="checkbox" data-metric="commercial" data-type="heat"> 
+                    <span>Коммерческая активность</span>
+                </label>
+                <label class="layer-toggle">
+                    <input type="checkbox" data-metric="real_estate" data-type="districts"> 
+                    <span>Стоимость недвижимости</span>
+                </label>
+            </div>
+        </details>
+
+        <details>
+            <summary>3. Социальный блок</summary>
+            <div class="metrics-group">
+                
+                <label class="layer-toggle">
+                    <input type="checkbox" data-metric="density_popul" data-type="districts"> 
+                    <span>Плотность населения</span>
+                </label>
+
+                <div class="divider"></div>
+
+                <div style="font-size:11px; color:#64748b; margin-bottom:4px; font-weight:600;">Безопасность</div>
+                <label class="layer-toggle">
+                    <input type="checkbox" data-metric="crime_density" data-type="districts"> 
+                    <span>Плотность правонарушений</span>
+                </label>
+                <label class="layer-toggle">
+                    <input type="checkbox" data-metric="crime_heat" data-type="heat_crime"> 
+                    <span>Тепловая карта преступлений</span>
+                </label>
+
+                <div class="divider"></div>
+
+                <div style="font-size:11px; color:#64748b; margin-bottom:4px; font-weight:600;">Социальные объекты</div>
+                <label class="layer-toggle"><input type="checkbox" data-metric="schools" data-type="social"> <span><i class="dot" style="background:#2563eb"></i>Школы</span></label>
+                <label class="layer-toggle"><input type="checkbox" data-metric="detsad" data-type="social"> <span><i class="dot" style="background:#f97316"></i>Детские сады</span></label>
+                <label class="layer-toggle"><input type="checkbox" data-metric="medical" data-type="social"> <span><i class="dot" style="background:#e11d48"></i>Медицина</span></label>
+                <label class="layer-toggle"><input type="checkbox" data-metric="college" data-type="social"> <span><i class="dot" style="background:#4f46e5"></i>Колледжи</span></label>
+                <label class="layer-toggle"><input type="checkbox" data-metric="vuz" data-type="social"> <span><i class="dot" style="background:#7e22ce"></i>ВУЗы</span></label>
+
+                <div class="divider"></div>
+
+                <div style="font-size:11px; color:#64748b; margin-bottom:4px; font-weight:600;">Экология</div>
+                <button class="metric-btn" disabled style="opacity:0.5; cursor: default; padding-left:0;">Данные в разработке</button>
+            </div>
+        </details>
+    </div>
+
+<script src="map.js"></script>
+</body>
+</html>

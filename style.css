@@ -1,0 +1,427 @@
+body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+#map { position: absolute; top: 0; bottom: 0; width: 100%; background: #f8f9fa; }
+
+/* --- Меню слева --- */
+.metrics-control-left {
+    position: absolute; top: 20px; left: 20px;
+    width: 260px; max-height: 85vh;
+    z-index: 10;
+    white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    background: transparent !important; /* Убираем общий фон */
+    box-shadow: none !important;       /* Убираем общую тень */
+    overflow: visible;                 /* Чтобы тень кнопок не обрезалась */
+}
+
+/* Счетчик и Сброс */
+.counter-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 15px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+}
+.counter-badge { font-size: 12px; font-weight: 600; color: #475569; }
+.counter-badge span { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 5px; }
+.reset-btn {
+    border: none; background: transparent; color: #ef4444; font-size: 11px; font-weight: 700; cursor: pointer;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.reset-btn:hover { color: #b91c1c; }
+
+details { border-bottom: 1px solid #eee; margin-bottom: 0; }
+summary { 
+    padding: 12px 15px; cursor: pointer; font-size: 13px; font-weight: 600; color: #1e293b;
+    /* Убран uppercase, шрифт чуть крупнее и темнее */
+    display: flex; justify-content: space-between; align-items: center; list-style: none;
+}
+summary::-webkit-details-marker { display: none; }
+summary::after { content: '+'; font-size: 16px; color: #999; }
+details[open] summary::after { content: '−'; }
+
+.metrics-group { padding: 10px 15px; background: #fff; display: flex; flex-direction: column; }
+.divider { height: 1px; background: #e2e8f0; margin: 8px 0; }
+
+/* Чекбоксы */
+.layer-toggle {
+    display: flex; align-items: center; width: 100%; text-align: left;
+    padding: 6px 0; border: none; background: transparent;
+    cursor: pointer; font-size: 13px; color: #555;
+    transition: all 0.2s;
+}
+.layer-toggle:hover { color: #000; }
+.layer-toggle input { margin-right: 10px; cursor: pointer; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+/* Группы кнопок (Bootstrap-like) */
+.btn-group {
+    display: flex; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; margin-bottom: 5px;
+}
+.btn-toggle {
+    flex: 1; border: none; background: #f8fafc; padding: 6px 4px;
+    font-size: 12px; color: #64748b; cursor: pointer;
+    border-right: 1px solid #e2e8f0; transition: all 0.2s;
+    font-weight: 500;
+}
+.btn-toggle:last-child { border-right: none; }
+.btn-toggle:hover { background: #f1f5f9; color: #333; }
+.btn-toggle.active { background: #3b82f6; color: white; font-weight: 600; }
+
+/* Кнопки маршрутов */
+.route-select-btn {
+    padding: 4px 8px; font-size: 11px; font-weight: 600; border: 1px solid #e2e8f0;
+    background: white; color: #64748b; border-radius: 4px; cursor: pointer; flex: 1 0 auto; text-align: center;
+    min-width: 24px;
+}
+.route-select-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+
+/* Прокрутка для списка маршрутов */
+#routes-panel {
+    display: none; /* Управляется JS */
+    flex-wrap: wrap; 
+    gap: 5px; 
+    margin-top: 5px;
+    padding-bottom: 10px; /* Отступ снизу, чтобы последние кнопки не прилипали */
+}
+
+/* Стилизация скроллбара (опционально, для красоты) */
+#routes-panel::-webkit-scrollbar { width: 4px; }
+#routes-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+/* Остальные панели */
+.description-panel {
+    position: absolute; bottom: 30px; left: 20px; width: 320px;
+    background: rgba(255, 255, 255, 0.98); padding: 12px 15px; border-radius: 12px;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.15); z-index: 9; 
+    font-size: 12px; border-left: 4px solid #3b82f6; display: none;
+}
+.desc-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #1e293b; }
+#descText {
+    display: none; /* СКРЫТО ПО УМОЛЧАНИЮ */
+    margin-top: 10px; 
+    color: #64748b; 
+    line-height: 1.4; 
+    border-top: 1px solid #f1f5f9; 
+    padding-top: 8px;
+}
+
+.chart-panel h4 { margin: 0 0 10px 0; font-size: 13px; color: #333; text-align: center; }
+.chart-container { position: relative; height: 160px; width: 100%; }
+
+.legend {
+    position: absolute; bottom: 30px; right: 20px; background: white; padding: 10px 15px;
+    border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    font-size: 11px; z-index: 9; min-width: 150px; display: none;
+}
+.legend-item { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.legend-color { width: 12px; height: 12px; border-radius: 3px; }
+.legend-labels { display: flex; justify-content: space-between; color: #666; font-size: 10px; }
+
+.basemap-switcher {
+    position: absolute; top: 20px; right: 20px; z-index: 10;
+    background: white; padding: 4px; border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; gap: 4px;
+}
+.basemap-btn {
+    border: none; background: transparent; padding: 6px 12px;
+    border-radius: 6px; font-size: 12px; font-weight: 600; color: #64748b;
+    cursor: pointer; transition: all 0.2s;
+}
+.basemap-btn:hover { background: #f1f5f9; color: #333; }
+.basemap-btn.active { background: #eff6ff; color: #2563eb; font-weight: 700; }
+
+.maplibregl-popup-content { padding: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+.popup-header { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; padding: 10px 15px; font-size: 14px; font-weight: 700; }
+.popup-body { padding: 0; max-height: 250px; overflow-y: auto; }
+.popup-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.popup-table tr { border-bottom: 1px solid #f1f5f9; }
+.popup-table td { padding: 6px 12px; }
+.popup-key { color: #64748b; font-weight: 500; width: 45%; }
+.popup-val { color: #1e293b; font-weight: 600; text-align: right; }
+
+.popup-rm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    text-align: center; /* Центрирование текста в ячейках */
+}
+.popup-rm-table td {
+    padding: 6px 12px;
+    border: 1px solid #f1f5f9; /* Разделение ячеек границей для видимости */
+    vertical-align: middle; /* Вертикальное центрирование */
+}
+.popup-rm-header {
+    background: #f8fafc;
+    padding: 6px;
+    font-weight: bold;
+    text-align: center;
+}
+.bg-renov {
+    background-color: #fee2e2; /* Красный фон для "Реновация" */
+}
+.bg-modern {
+    background-color: #ecfdf5; /* Зеленый фон для "Модернизация" */
+}
+
+.hotspot-btn {
+    background: #fff1f2; border: 1px solid #fda4af; 
+    color: #be123c; padding: 6px 10px; border-radius: 4px;
+    font-size: 11px; cursor: pointer; text-align: left;
+    transition: all 0.2s;
+}
+.hotspot-btn:hover {
+    background: #be123c; color: white; border-color: #be123c;
+}
+
+/* Сетка кнопок в 2 колонки */
+#hotspotsButtons {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Две равные колонки */
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+/* Кнопки теперь занимают всю ширину ячейки */
+.hotspot-btn {
+    width: 100%;
+    text-align: center;
+    padding: 8px 4px;
+    font-size: 10px;
+    line-height: 1.2;
+}
+
+.hotspot-btn.active {
+    background: #be123c !important;
+    color: white !important;
+    border-color: #be123c !important;
+}
+
+/* Блок описания под кнопками */
+.hotspot-info-text {
+    display: none; /* Скрыт, пока не нажата кнопка */
+    padding: 10px;
+    background: #fff5f5;
+    border-radius: 8px;
+    font-size: 11px;
+    color: #991b1b;
+    border: 1px dashed #fca5a5;
+    line-height: 1.4;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Кнопка Рубрикатор */
+.rubricator-btn {
+    width: 42px; height: 42px;         /* Размер самой кнопки */
+    background: white !important;
+    border-radius: 10px;               /* Скругление как у блоков */
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 10px;               /* Отступ от меню (разделение) */
+}
+
+.rubricator-btn img {
+    width: 24px; height: 24px;         /* Уменьшили саму иконку внутри */
+}
+
+.rubricator-btn:hover {
+    transform: scale(1.05);
+    border-color: #3b82f6;
+}
+
+/* Состояние, когда меню свернуто */
+/* Настраиваем свернутое состояние под размер иконки */
+.collapsed-menu {
+    /* Вместо 42px ставим auto или ширину, вмещающую 3 иконки (~150px) */
+    width: auto !important; 
+    max-height: 60px !important; /* Оставляем высоту только для верхнего ряда */
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.collapsed-menu .rubricator-btn {
+    border-radius: 12px;
+}
+
+.collapsed-menu #menuContent {
+    display: none;
+}
+
+/* Фикс ширины для свернутого состояния */
+.collapsed-menu {
+    width: 42px !important;
+}
+
+#menuContent {
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    overflow: hidden;
+    display: block;
+    /* НОВОЕ: Ограничиваем высоту и добавляем скролл */
+    max-height: 70vh; 
+    overflow-y: auto; 
+    /* Плавный скролл */
+    scrollbar-width: thin; 
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Стилизация скроллбара (для Chrome/Safari) */
+#menuContent::-webkit-scrollbar { width: 6px; }
+#menuContent::-webkit-scrollbar-track { background: transparent; }
+#menuContent::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+
+/* Убираем Caps Lock у заголовков (вы просили обычный регистр) */
+summary {
+    text-transform: none !important;
+}
+
+/* 2. Плавающая кнопка (аналог рубрикатора) */
+.chart-floating-btn {
+    width: 42px;
+    height: 42px;
+    background: #2563eb !important; /* Синий цвет как у рубрикатора */
+    color: white;
+    border-radius: 10px;
+    border: 1px solid #1d4ed8;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    margin-bottom: 10px; /* Разрыв между кнопкой и панелью */
+}
+
+.chart-floating-btn:hover {
+    transform: scale(1.05);
+    background: #1d4ed8 !important;
+}
+
+.chart-content-box, #chartContent {
+    margin-top: 8px; /* Небольшой зазор между рядом кнопок и панелью */
+}
+
+/* 3. Основное поле с диаграммой (отдельный блок) */
+.chart-content-box {
+    width: 260px;
+    background: rgba(255, 255, 255, 0.9); /* Матовое стекло */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    display: block;
+}
+
+/* Анимация появления контента */
+#chartContent {
+    transition: opacity 0.3s ease;
+    margin-top: 10px;
+}
+
+/* Описание: делаем его заметным */
+.description-panel {
+    display: none; /* Будет включаться через JS */
+}
+
+.map-rk-link {
+    background: white; 
+    padding: 6px 12px; 
+    border-radius: 8px; 
+    text-decoration: none; 
+    color: #333; 
+    font-weight: bold; 
+    font-size: 12px; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+    display: flex; 
+    align-items: center; 
+    gap: 6px;
+    height: 32px; /* Высота как у кнопок переключателя */
+    box-sizing: border-box;
+}
+
+.logo-circle {
+    background: white; 
+    border: 1px solid #cbd5e1; 
+    border-radius: 50%; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    width: 36px; /* Чуть увеличил для баланса с кнопкой 42px */
+    height: 36px;
+    transition: transform 0.2s;
+}
+
+.logo-circle:hover { transform: scale(1.1); }
+
+/* =========================================
+   НОВЫЕ СТИЛИ ДЛЯ ПАНЕЛИ СТАТИСТИКИ
+   ========================================= */
+
+/* Основной контейнер статистики */
+.chart-panel {
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    z-index: 100;
+    display: none; /* Включается через JS */
+    flex-direction: column;
+    align-items: flex-end; /* ВАЖНО: Прижимает всё содержимое (и кнопку) вправо */
+    width: 260px; /* Фиксируем ширину, чтобы контейнер не "гулял" */
+    background: transparent !important;
+    pointer-events: none; /* Чтобы прозрачный контейнер не перекрывал карту */
+}
+
+/* Кнопка: стиль и размер как у рубрикатора */
+.chart-toggle-btn {
+    width: 32px;
+    height: 32px;
+    background: white !important;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-bottom: 0px;
+    /* Убираем align-self, так как родитель уже выравнивает по правому краю */
+}
+
+.chart-toggle-btn:hover {
+    transform: scale(1.05);
+    border-color: #3b82f6;
+}
+
+.chart-toggle-btn, #chartContent {
+    pointer-events: auto;
+}
+
+/* 3. Панель с контентом (Сам график и инфо) */
+#chartContent {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    width: 240px; /* Ширина самой панели данных */
+    display: block; /* По умолчанию развернута */
+}
+
+/* 4. Состояние "Свернуто" */
+/* Когда у родителя .chart-panel есть класс .chart-collapsed, скрываем только контент */
+.chart-collapsed #chartContent {
+    display: none !important;
+}
