@@ -1,5 +1,5 @@
 //const TILE_SERVER = 'http://localhost:7800';
-const TILE_SERVER = './tiles';
+const TILE_SERVER = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '') + '/tiles';
 
 const fieldAliases = {
     'level': 'Этажность', 'address': 'Адрес', 'status': 'Тип', 
@@ -215,6 +215,7 @@ const layersConfig = {
 };
 
 let myChart = null;
+let renovDataListener = null;
 
 const map = new maplibregl.Map({
     container: 'map',
@@ -245,12 +246,13 @@ map.on('load', async () => {
     if (image) map.addImage('custom-marker', image.data);
 
 function addSrc(name) {
-        // Убрали "public.", теперь путь прямой: ./tiles/имя_слоя/{z}/{x}/{y}.pbf
-        map.addSource(name, { 
-            'type': 'vector', 
-            'tiles': [`${TILE_SERVER}/${name}/{z}/{x}/{y}.pbf`] 
-        });
-    }
+    map.addSource(name, { 
+        'type': 'vector', 
+        'tiles': [`${TILE_SERVER}/${name}/{z}/{x}/{y}.pbf`],
+        'minzoom': 10,
+        'maxzoom': 16 // Укажите тот максимум, который вы выставили в QGIS при экспорте
+    });
+}
             // function addSrc(name) {
             //     map.addSource(name, { 'type': 'vector', 'tiles': [`${TILE_SERVER}/public.${name}/{z}/{x}/{y}.pbf`] });
             // }
@@ -259,45 +261,60 @@ function addSrc(name) {
 
     // Зоны обслуживания
     map.addLayer({
-        'id': 'layer-schools-zone', 'type': 'circle', 'source': 'schools', 'source-layer': 'public.schools',
+        'id': 'layer-schools-zone', 'type': 'circle', 'source': 'schools', 'source-layer': 'schools',
         'layout': { 'visibility': 'none' },
         'paint': { 'circle-color': '#2563eb', 'circle-opacity': 0.15, 'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 12, 22, 16, 350], 'circle-pitch-alignment': 'map' }
     });
     map.addLayer({
-        'id': 'layer-detsad-zone', 'type': 'circle', 'source': 'detsad', 'source-layer': 'public.detsad',
+        'id': 'layer-detsad-zone', 'type': 'circle', 'source': 'detsad', 'source-layer': 'detsad',
         'layout': { 'visibility': 'none' },
         'paint': { 'circle-color': '#f97316', 'circle-opacity': 0.15, 'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 12, 13, 16, 208], 'circle-pitch-alignment': 'map' }
     });
 
     // Создание слоев из конфига
-    for (const [metric, conf] of Object.entries(layersConfig)) {
-        const layerOptions = {
-            'id': `layer-${metric}`, 'type': conf.type, 'source': conf.source, 'source-layer': `public.${conf.source}`,
-            'layout': { 'visibility': 'none' }, 'paint': conf.paint
-        };
-        map.addLayer(layerOptions);
-    }
+// Замените 'source-layer': `public.${conf.source}` на 'source-layer': conf.source
+for (const [metric, conf] of Object.entries(layersConfig)) {
+    const layerOptions = {
+        'id': `layer-${metric}`, 
+        'type': conf.type, 
+        'source': conf.source, 
+        'source-layer': conf.source, // ТУТ: убрали public.
+        'layout': { 'visibility': 'none' }, 
+        'paint': conf.paint
+    };
+    map.addLayer(layerOptions);
+}
 
     // Доп. слои
-    map.addLayer({ 'id': 'layer-bus_stops', 'type': 'circle', 'source': 'bus_stops', 'source-layer': 'public.bus_stops', 'layout': {'visibility': 'none'}, 'paint': { 'circle-radius': 4, 'circle-color': '#64748b' } });
-    map.addLayer({ 'id': 'layer-districts-border', 'type': 'line', 'source': 'districts', 'source-layer': 'public.districts', 'layout': { 'visibility': 'none' }, 'paint': { 'line-color': '#94a3b8', 'line-width': 1 } });
-    map.addLayer({ 'id': 'layer-transport-highlight', 'type': 'line', 'source': 'bus_routes', 'source-layer': 'public.bus_routes', 'paint': { 'line-color': '#facc15', 'line-width': 6 }, 'filter': ['==', 'name', ''] });
+    map.addLayer({ 'id': 'layer-bus_stops', 'type': 'circle', 'source': 'bus_stops', 'source-layer': 'bus_stops', 'layout': {'visibility': 'none'}, 'paint': { 'circle-radius': 4, 'circle-color': '#64748b' } });
+    map.addLayer({ 'id': 'layer-districts-border', 'type': 'line', 'source': 'districts', 'source-layer': 'districts', 'layout': { 'visibility': 'none' }, 'paint': { 'line-color': '#94a3b8', 'line-width': 1 } });
+    map.addLayer({ 'id': 'layer-transport-highlight', 'type': 'line', 'source': 'bus_routes', 'source-layer': 'bus_routes', 'paint': { 'line-color': '#facc15', 'line-width': 6 }, 'filter': ['==', 'name', ''] });
 
     // Иконки соц. объектов
-    ['schools', 'medical', 'detsad', 'college', 'vuz'].forEach(id => {
-        const colorMap = {'schools':'#2563eb', 'medical':'#e11d48', 'detsad':'#f97316', 'college':'#4f46e5', 'vuz':'#7e22ce'};
-        map.addLayer({
-            'id': `layer-${id}`, 'type': 'circle', 'source': id, 'source-layer': `public.${id}`, 'layout': {'visibility': 'none'},
-            'paint': { 'circle-radius': 6, 'circle-color': colorMap[id], 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' }
-        });
+// ИКОНКИ (Социалка) - исправлено для работы без PostGIS сервера
+['schools', 'medical', 'detsad', 'college', 'vuz'].forEach(id => {
+    const colorMap = {'schools':'#2563eb', 'medical':'#e11d48', 'detsad':'#f97316', 'college':'#4f46e5', 'vuz':'#7e22ce'};
+    map.addLayer({
+        'id': `layer-${id}`, 
+        'type': 'circle', 
+        'source': id, 
+        'source-layer': id, // УБРАЛИ "public.", теперь просто id (например, 'schools')
+        'layout': {'visibility': 'none'},
+        'paint': { 
+            'circle-radius': 6, 
+            'circle-color': colorMap[id], 
+            'circle-stroke-width': 1, 
+            'circle-stroke-color': '#fff' 
+        }
     });
+});
 
 // 1. Основная заливка (почти прозрачная)
 map.addLayer({
     'id': 'layer-renovatio',
     'type': 'fill',
     'source': 'renovatio',
-    'source-layer': 'public.renovatio',
+    'source-layer': 'renovatio',
     'layout': { 'visibility': 'none' },
     'paint': { 
         'fill-color': '#e11d48', 
@@ -310,7 +327,7 @@ map.addLayer({
     'id': 'layer-renovatio-outline',
     'type': 'line',
     'source': 'renovatio',
-    'source-layer': 'public.renovatio',
+    'source-layer': 'renovatio',
     'layout': { 'visibility': 'none' },
     'paint': {
         'line-color': '#e11d48',
@@ -324,7 +341,7 @@ map.addLayer({
     'id': 'layer-renovatio-highlight',
     'type': 'fill',
     'source': 'renovatio',
-    'source-layer': 'public.renovatio',
+    'source-layer': 'renovatio',
     'layout': { 'visibility': 'none' },
     'paint': {
         'fill-color': '#e11d48',
@@ -336,10 +353,10 @@ map.addLayer({
     reorderLayers();
 
     // Подсветка
-    map.addLayer({ 'id': 'highlight-builds', 'type': 'line', 'source': 'builds', 'source-layer': 'public.builds', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
-    map.addLayer({ 'id': 'highlight-plots', 'type': 'line', 'source': 'plots', 'source-layer': 'public.plots', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
-    map.addLayer({ 'id': 'highlight-districts', 'type': 'line', 'source': 'districts', 'source-layer': 'public.districts', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
-    map.addLayer({ 'id': 'highlight-rm', 'type': 'line', 'source': 'rm', 'source-layer': 'public.rm', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
+    map.addLayer({ 'id': 'highlight-builds', 'type': 'line', 'source': 'builds', 'source-layer': 'builds', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
+    map.addLayer({ 'id': 'highlight-plots', 'type': 'line', 'source': 'plots', 'source-layer': 'plots', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
+    map.addLayer({ 'id': 'highlight-districts', 'type': 'line', 'source': 'districts', 'source-layer': 'districts', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
+    map.addLayer({ 'id': 'highlight-rm', 'type': 'line', 'source': 'rm', 'source-layer': 'rm', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
 
     // --- Логика клика (Popup) ---
     map.on('click', (e) => {
@@ -456,7 +473,7 @@ if (metric === 'score_renov') {
                 const updateRenovData = () => {
                     // Ищем объекты в источнике renovatio
                     const features = map.querySourceFeatures('renovatio', {
-                        sourceLayer: 'public.renovatio'
+                        sourceLayer: 'renovatio'
                     });
 
                     const uniquePoints = new Map();
@@ -564,7 +581,8 @@ function renderHotspotsButtons(data) {
                 b.style.background = '#f8fafc'; 
                 b.style.color = '#333';
             });
-            btn.style.borderColor = '#e11d48'; 
+            document.querySelectorAll('.hotspot-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
             btn.style.background = '#fff1f2'; 
             btn.style.color = '#be123c';
         };
