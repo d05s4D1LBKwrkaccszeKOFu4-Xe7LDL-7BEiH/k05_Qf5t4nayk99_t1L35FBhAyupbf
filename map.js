@@ -1,5 +1,5 @@
 //const TILE_SERVER = 'http://localhost:7800';
-const TILE_SERVER = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '') + '/tiles';
+const PMTILES_PATH = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '') + '/tiles/';
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol("pmtiles", protocol.tile);
 
@@ -248,14 +248,13 @@ map.on('load', async () => {
     if (image) map.addImage('custom-marker', image.data);
 
 function addSrc(name) {
-        map.addSource(name, { 
-            'type': 'vector',
-            // Важное изменение: используем 'url' вместо 'tiles' и протокол pmtiles://
-            'url': `pmtiles://${TILE_SERVER}/${name}.pmtiles`,
-            'minzoom': 10,  // Можно оставить или убрать, PMTiles сам знает свои зумы
-            'maxzoom': 16   // Можно оставить или убрать
-        });
-    }
+    map.addSource(name, {
+        type: 'vector',
+        url: `pmtiles://${PMTILES_PATH}${name}.pmtiles`,  // Пример: pmtiles://.../tiles/builds.pmtiles
+        minzoom: 10,  // Твои зумы
+        maxzoom: 16
+    });
+}
             // function addSrc(name) {
             //     map.addSource(name, { 'type': 'vector', 'tiles': [`${TILE_SERVER}/public.${name}/{z}/{x}/{y}.pbf`] });
             // }
@@ -354,6 +353,7 @@ map.addLayer({
 });
 
     reorderLayers();
+    map.on('error', (e) => console.error('Map error:', e));
 
     // Подсветка
     map.addLayer({ 'id': 'highlight-builds', 'type': 'line', 'source': 'builds', 'source-layer': 'builds', 'paint': { 'line-color': '#ef4444', 'line-width': 3 }, 'filter': ['==', 'gid', -1] });
