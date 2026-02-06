@@ -1,5 +1,7 @@
 //const TILE_SERVER = 'http://localhost:7800';
 const TILE_SERVER = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '') + '/tiles';
+let protocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles", protocol.add);
 
 const fieldAliases = {
     'level': 'Этажность', 'address': 'Адрес', 'status': 'Тип', 
@@ -246,13 +248,14 @@ map.on('load', async () => {
     if (image) map.addImage('custom-marker', image.data);
 
 function addSrc(name) {
-    map.addSource(name, { 
-        'type': 'vector', 
-        'tiles': [`${TILE_SERVER}/${name}/{z}/{x}/{y}.pbf`],
-        'minzoom': 10,
-        'maxzoom': 16 // Укажите тот максимум, который вы выставили в QGIS при экспорте
-    });
-}
+        map.addSource(name, { 
+            'type': 'vector',
+            // Важное изменение: используем 'url' вместо 'tiles' и протокол pmtiles://
+            'url': `pmtiles://${TILE_SERVER}/${name}.pmtiles`,
+            'minzoom': 10,  // Можно оставить или убрать, PMTiles сам знает свои зумы
+            'maxzoom': 16   // Можно оставить или убрать
+        });
+    }
             // function addSrc(name) {
             //     map.addSource(name, { 'type': 'vector', 'tiles': [`${TILE_SERVER}/public.${name}/{z}/{x}/{y}.pbf`] });
             // }
